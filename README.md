@@ -16,6 +16,16 @@ npm run dev                  # http://localhost:3000
 
 **It runs with zero API keys** (deterministic mock reasoning). Add an **xAI / Grok** key in `.env.local` to make the agents LLM-voiced — and to qualify for the xAI sponsor track.
 
+## Telephony bridge (Twilio + Grok Voice)
+
+Run the live phone bridge service:
+
+```bash
+npm run telephony:bridge
+```
+
+Setup steps and Twilio webhook config are documented in [`docs/telephony-bridge.md`](docs/telephony-bridge.md).
+
 ## The demo flow (one page, scripted happy path)
 
 1. **Intake** — describe the problem; rule-first crisis triage (988 escalation if needed).

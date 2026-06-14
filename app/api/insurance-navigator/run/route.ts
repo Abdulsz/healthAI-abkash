@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import * as insuranceCheckOrchestrator from "../../../../features/insurance-navigator/orchestrator/runInsuranceCheck";
-import { ServiceErrorResponse } from "../../../../features/insurance-navigator/domain/contracts";
-import { InsuranceAdapterExecutionError } from "../../../../features/insurance-navigator/domain/errors";
+import { runInsuranceNavigatorSession } from "@/features/insurance-navigator/orchestrator/runInsuranceNavigatorSession";
+import { InsuranceAdapterExecutionError } from "@/features/insurance-navigator/domain/errors";
+import { ServiceErrorResponse } from "@/features/insurance-navigator/domain/contracts";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -10,10 +10,12 @@ const JSON_HEADERS = {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   try {
-    const result = await insuranceCheckOrchestrator.runInsuranceCheck(body);
-
+    const result = await runInsuranceNavigatorSession(body);
     if (!result.ok) {
-      return NextResponse.json(result.error, { status: 400, headers: JSON_HEADERS });
+      return NextResponse.json(result.error, {
+        status: 400,
+        headers: JSON_HEADERS,
+      });
     }
 
     return NextResponse.json(result.data, { headers: JSON_HEADERS });

@@ -19,6 +19,7 @@ describe("POST /api/insurance-navigator/check", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/json; charset=utf-8");
     expect(payload.intake).toMatchObject({
       plan_name: "Blue Cross PPO",
       member_id: "MEM001",

@@ -61,6 +61,14 @@ export function validateInsuranceNavigatorIntake(body: unknown): ValidationResul
     });
   }
 
+  const callbackPhone = normalizeString(body.callback_phone);
+  if (callbackPhone && !/^\+?[1-9]\d{9,14}$/.test(callbackPhone)) {
+    issues.push({
+      field: "callback_phone",
+      message: "must be a valid E.164 phone (example: +12298293537)",
+    });
+  }
+
   if (issues.length > 0) {
     return {
       ok: false,
@@ -80,6 +88,7 @@ export function validateInsuranceNavigatorIntake(body: unknown): ValidationResul
       procedure_description: normalizeString(body.procedure_description),
       zip_code: zip,
       member_services_phone_override: phoneOverride || undefined,
+      callback_phone: callbackPhone || undefined,
     },
   };
 }

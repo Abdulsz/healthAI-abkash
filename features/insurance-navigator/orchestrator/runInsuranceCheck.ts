@@ -3,9 +3,11 @@ import {
   INSURANCE_ADAPTER_ENV_KEY,
 } from "../config/constants";
 import {
+  InsuranceCallResult,
   InsuranceNavigatorCheckResponse,
   ValidationErrorResponse,
 } from "../domain/contracts";
+import { InsuranceAdapterExecutionError } from "../domain/errors";
 import { validateInsuranceNavigatorIntake } from "../domain/validation";
 import { mapProcedureToCpt } from "../adapters/cptMapper";
 import { resolveInsuranceMemberServicesPhone } from "../adapters/insuranceLookup";
@@ -43,14 +45,23 @@ export async function runInsuranceCheck(body: unknown): Promise<OrchestratorResu
   });
 
   const adapter = buildInsuranceCallAdapter();
-  const insuranceCallResult = await adapter.checkCoverage({
-    plan_name: intake.plan_name,
-    member_id: intake.member_id,
-    group_number: intake.group_number,
-    cpt_code: cpt.cpt_code,
-    procedure_name: cpt.procedure_name,
-    member_services_phone: phoneResolution.phone,
-  });
+  let insuranceCallResult: InsuranceCallResult;
+  try {
+    insuranceCallResult = await adapter.checkCoverage({
+      plan_name: intake.plan_name,
+      member_id: intake.member_id,
+      group_number: intake.group_number,
+      cpt_code: cpt.cpt_code,
+      procedure_name: cpt.procedure_name,
+      member_services_phone: phoneResolution.phone,
+    });
+  } catch (err) {
+    const normalizedError = err instanceof Error ? err : new Error(String(err));
+    throw new InsuranceAdapterExecutionError(
+      "Insurance adapter execution failed.",
+      normalizedError
+    );
+  }
 
   return {
     ok: true,

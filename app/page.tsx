@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { IntakeRecord, NegotiationResult } from "@/lib/a2a/types";
 import { CARE_PLAN } from "@/lib/data/transcript";
 import NegotiationTheater from "@/components/NegotiationTheater";
@@ -61,6 +62,11 @@ export default function Home() {
           Everyone at the table already has an agent — the hospital, the clinic, the
           insurer. Everyone except the patient. This is theirs.
         </p>
+        <div style={{ marginTop: 12 }}>
+          <Link href="/insurance-navigator" style={{ color: "#93c5fd", fontSize: 14 }}>
+            Open Insurance Navigator MVP →
+          </Link>
+        </div>
       </header>
 
       {/* Stage 1 — Intake */}
