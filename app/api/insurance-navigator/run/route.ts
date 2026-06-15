@@ -3,6 +3,9 @@ import { runInsuranceNavigatorSession } from "@/features/insurance-navigator/orc
 import { InsuranceAdapterExecutionError } from "@/features/insurance-navigator/domain/errors";
 import { ServiceErrorResponse } from "@/features/insurance-navigator/domain/contracts";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
 };

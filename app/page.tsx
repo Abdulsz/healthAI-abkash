@@ -53,18 +53,26 @@ export default function Home() {
   }
 
   return (
-    <main style={{ maxWidth: 920, margin: "0 auto", padding: "40px 20px 80px" }}>
-      <header style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 30, fontWeight: 700, margin: 0 }}>
-          The Patient&apos;s Agent
+    <main className="in-main" style={{ maxWidth: 920 }}>
+      <header
+        className="in-reveal"
+        style={{ animationDelay: "0.05s", marginBottom: 34, paddingTop: 12 }}
+      >
+        <p className="in-kicker">A2A · Patient Advocacy</p>
+        <h1 className="in-title">
+          The patient&apos;s <em>agent</em>.
         </h1>
-        <p style={{ color: "#8a8aa0", marginTop: 8, fontSize: 15, lineHeight: 1.5 }}>
+        <p className="in-lede">
           Everyone at the table already has an agent — the hospital, the clinic, the
           insurer. Everyone except the patient. This is theirs.
         </p>
-        <div style={{ marginTop: 12 }}>
-          <Link href="/insurance-navigator" style={{ color: "#93c5fd", fontSize: 14 }}>
-            Open Insurance Navigator MVP →
+        <div style={{ marginTop: 18 }}>
+          <Link
+            href="/insurance-navigator"
+            className="in-btn in-btn-secondary"
+            style={{ display: "inline-block", textDecoration: "none" }}
+          >
+            Open Insurance Navigator →
           </Link>
         </div>
       </header>
@@ -88,7 +96,7 @@ export default function Home() {
           </div>
         )}
         {intake && !crisis && (
-          <div style={{ fontSize: 13, color: "#6ee7a8", marginTop: 10 }}>
+          <div style={{ fontSize: 14, color: "var(--vital)", marginTop: 12 }}>
             ✓ Understood: {intake.chiefComplaint} — flagged as {intake.category}, {intake.severity}.
           </div>
         )}
@@ -108,10 +116,10 @@ export default function Home() {
       {negotiation && (stage === "gate" || stage === "booked") && (
         <Section title="3 · You decide">
           {stage === "booked" ? (
-            <div style={{ ...sectionInner, borderColor: "#6ee7a8" }}>
+            <div style={{ ...sectionInner, borderColor: "var(--vital)" }}>
               ✓ Booked with {negotiation.appointment.provider} —{" "}
               {negotiation.appointment.datetime}. Confirmation{" "}
-              <b style={{ color: "#6ee7a8" }}>{confirmation}</b>. Reminders set.
+              <b style={{ color: "var(--vital)" }}>{confirmation}</b>. Reminders set.
             </div>
           ) : (
             <AgencyGate
@@ -145,8 +153,18 @@ export default function Home() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 26 }}>
-      <h2 style={{ fontSize: 13, letterSpacing: 1, textTransform: "uppercase", color: "#8a8aa0", marginBottom: 12 }}>
+    <section style={{ marginBottom: 30 }}>
+      <h2
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "var(--accent-deep)",
+          marginBottom: 14,
+        }}
+      >
         {title}
       </h2>
       {children}
@@ -156,8 +174,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Plan({ k, v }: { k: string; v: string }) {
   return (
-    <div style={{ display: "flex", gap: 10, padding: "3px 0", fontSize: 14 }}>
-      <span style={{ width: 110, color: "#8a8aa0" }}>{k}</span>
+    <div style={{ display: "flex", gap: 12, padding: "5px 0", fontSize: 15 }}>
+      <span
+        style={{
+          width: 120,
+          flexShrink: 0,
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--ink-soft)",
+        }}
+      >
+        {k}
+      </span>
       <span>{v}</span>
     </div>
   );
@@ -171,43 +199,49 @@ function hash(s: string) {
 
 const textareaStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0e0e16",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: 12,
-  color: "#e7e7ef",
-  fontSize: 15,
-  lineHeight: 1.5,
+  background: "var(--field)",
+  border: "1px solid transparent",
+  borderRadius: 12,
+  padding: 14,
+  color: "var(--ink)",
+  fontFamily: "var(--font-body)",
+  fontSize: 16,
+  lineHeight: 1.55,
   resize: "vertical",
-  marginBottom: 12,
+  marginBottom: 14,
 };
 
 const primaryBtn: React.CSSProperties = {
-  background: "#6ea8fe",
-  color: "#06122a",
-  border: "none",
-  borderRadius: 8,
-  padding: "11px 20px",
-  fontWeight: 600,
+  fontFamily: "var(--font-body)",
   fontSize: 15,
+  fontWeight: 600,
+  background: "linear-gradient(180deg, #c08e22, var(--accent-deep))",
+  color: "var(--accent-text)",
+  border: "1px solid var(--accent-deep)",
+  borderRadius: 13,
+  padding: "13px 22px",
   cursor: "pointer",
+  boxShadow: "0 14px 30px -16px rgba(138, 94, 14, 0.9)",
 };
 
 const sectionInner: React.CSSProperties = {
-  background: "var(--panel)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: 16,
+  background: "var(--card)",
+  border: "1px solid var(--line)",
+  borderRadius: 18,
+  padding: 22,
   fontSize: 15,
-  lineHeight: 1.5,
+  lineHeight: 1.55,
+  boxShadow: "var(--shadow-soft)",
+  backdropFilter: "blur(12px)",
 };
 
 const crisisBox: React.CSSProperties = {
-  marginTop: 14,
-  background: "#3a1620",
-  border: "1px solid #e08a8a",
-  borderRadius: 10,
-  padding: 14,
-  fontSize: 14,
-  lineHeight: 1.5,
+  marginTop: 16,
+  background: "var(--danger-soft)",
+  border: "1px solid var(--danger-soft)",
+  borderLeft: "3px solid var(--danger)",
+  borderRadius: 12,
+  padding: 16,
+  fontSize: 15,
+  lineHeight: 1.55,
 };

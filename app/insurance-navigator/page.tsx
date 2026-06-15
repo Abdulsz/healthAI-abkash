@@ -109,6 +109,39 @@ const initialForm: IntakeForm = {
 
 const SAVED_INSURANCE_STORAGE_KEY = "insurance_navigator_saved_info_v1";
 
+const THEME_PRESETS: Array<{ name: string; css: string; swatch: string }> = [
+  {
+    name: "Quantum",
+    css:
+      "radial-gradient(120% 120% at 18% 22%, #5b2bd6 0%, transparent 55%), radial-gradient(120% 120% at 82% 28%, #df4fb2 0%, transparent 50%), radial-gradient(130% 130% at 72% 92%, #f2913d 0%, transparent 55%), linear-gradient(135deg, #361a82, #7b2fc4 52%, #ea5d9c)",
+    swatch: "linear-gradient(120deg, #5b2bd6, #df4fb2 55%, #f2913d)",
+  },
+  {
+    name: "Aurora",
+    css:
+      "radial-gradient(120% 120% at 20% 20%, #1f9e8f 0%, transparent 55%), radial-gradient(120% 120% at 82% 30%, #66d6ac 0%, transparent 50%), radial-gradient(130% 130% at 70% 92%, #3a6df0 0%, transparent 55%), linear-gradient(135deg, #0e6a66, #1fa18f 52%, #3f7ef0)",
+    swatch: "linear-gradient(120deg, #1f9e8f, #66d6ac 50%, #3f7ef0)",
+  },
+  {
+    name: "Ember",
+    css:
+      "radial-gradient(120% 120% at 20% 20%, #f4b53c 0%, transparent 55%), radial-gradient(120% 120% at 82% 32%, #ea6a2e 0%, transparent 52%), radial-gradient(130% 130% at 70% 92%, #b22a5e 0%, transparent 55%), linear-gradient(135deg, #c0421f, #e5602f 50%, #f0a93c)",
+    swatch: "linear-gradient(120deg, #f4b53c, #ea6a2e 50%, #b22a5e)",
+  },
+  {
+    name: "Tidal",
+    css:
+      "radial-gradient(120% 120% at 18% 22%, #2b5bd6 0%, transparent 55%), radial-gradient(120% 120% at 82% 28%, #3fc6e8 0%, transparent 50%), radial-gradient(130% 130% at 72% 92%, #6a3fd6 0%, transparent 55%), linear-gradient(135deg, #16357f, #2c63c4 52%, #46c7e0)",
+    swatch: "linear-gradient(120deg, #2b5bd6, #3fc6e8 50%, #6a3fd6)",
+  },
+  {
+    name: "Bloom",
+    css:
+      "radial-gradient(120% 120% at 20% 20%, #e85aa8 0%, transparent 55%), radial-gradient(120% 120% at 82% 30%, #f59abf 0%, transparent 50%), radial-gradient(130% 130% at 70% 92%, #f4a259 0%, transparent 55%), linear-gradient(135deg, #c23a86, #e85aa8 52%, #f4b07a)",
+    swatch: "linear-gradient(120deg, #e85aa8, #f59abf 50%, #f4a259)",
+  },
+];
+
 function getLocalStorageOrNull(): Storage | null {
   if (typeof window === "undefined") {
     return null;
@@ -141,6 +174,19 @@ export default function InsuranceNavigatorPage() {
   );
   const [bookingCallLoading, setBookingCallLoading] = useState(false);
   const [savedPlanBanner, setSavedPlanBanner] = useState<string | null>(null);
+  const [themeIdx, setThemeIdx] = useState(0);
+
+  const theme = THEME_PRESETS[themeIdx];
+  function shuffleTheme() {
+    setThemeIdx((prev) => {
+      if (THEME_PRESETS.length < 2) return prev;
+      let next = prev;
+      while (next === prev) {
+        next = Math.floor(Math.random() * THEME_PRESETS.length);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     const storage = getLocalStorageOrNull();
@@ -470,247 +516,313 @@ export default function InsuranceNavigatorPage() {
   }
 
   return (
-    <main style={styles.main}>
-      <header style={styles.header}>
-        <h1 style={styles.h1}>Insurance Navigator MVP</h1>
-        <p style={styles.subtle}>
-          Full hackathon flow: verify coverage, compare provider pricing, estimate your
-          out-of-pocket cost, and trigger booking.
-        </p>
-      </header>
+    <main className="in-main">
+      <div className="in-topbar in-reveal" style={{ animationDelay: "0.04s" }}>
+        <span className="in-chip">
+          <span className="in-chip-dot" />
+          Patient&apos;s Navigator
+        </span>
+        <span className="in-chip in-chip--ghost">Insurance · MVP</span>
+      </div>
 
       {savedPlanBanner && (
-        <div style={styles.savedBanner}>
-          Welcome back — using your saved {savedPlanBanner} plan.
-          <button type="button" onClick={clearSavedInsuranceInfo} style={styles.clearButton}>
+        <div className="in-banner in-reveal" style={{ animationDelay: "0.08s" }}>
+          <span>
+            Welcome back — using your saved <strong>{savedPlanBanner}</strong> plan.
+          </span>
+          <button type="button" onClick={clearSavedInsuranceInfo} className="in-clear">
             Clear
           </button>
         </div>
       )}
 
-      <form onSubmit={submit} style={styles.formCard}>
-        <Field
-          label="Plan Name"
-          value={form.plan_name}
-          onChange={(v) => setField("plan_name", v)}
-          placeholder="Blue Cross PPO"
-          error={issueByField.get("plan_name")}
-        />
-        <Field
-          label="Member ID"
-          value={form.member_id}
-          onChange={(v) => setField("member_id", v)}
-          placeholder="MEM001"
-          error={issueByField.get("member_id")}
-        />
-        <Field
-          label="Group Number"
-          value={form.group_number}
-          onChange={(v) => setField("group_number", v)}
-          placeholder="GRP001"
-          error={issueByField.get("group_number")}
-        />
-        <Field
-          label="Procedure Description"
-          value={form.procedure_description}
-          onChange={(v) => setField("procedure_description", v)}
-          placeholder="My doctor said I need a knee MRI"
-          multiline
-          error={issueByField.get("procedure_description")}
-        />
-        <Field
-          label="Zip Code"
-          value={form.zip_code}
-          onChange={(v) => setField("zip_code", v)}
-          placeholder="94103"
-          error={issueByField.get("zip_code")}
-        />
-        <Field
-          label="Insurance + Booking Demo Number (Your Phone)"
-          value={form.callback_phone}
-          onChange={(v) => setField("callback_phone", v)}
-          placeholder="+12298293537"
-          error={issueByField.get("callback_phone")}
-        />
-        <label style={styles.checkboxWrap}>
-          <input
-            type="checkbox"
-            checked={form.save_insurance_info}
-            onChange={(e) => setField("save_insurance_info", e.target.checked)}
-          />
-          <span>Save my insurance info for future visits</span>
-        </label>
+      <div className="in-compose">
+        <aside className="in-poster-col in-reveal" style={{ animationDelay: "0.08s" }}>
+          <div className="in-poster" style={{ backgroundImage: theme.css }}>
+            <span className="in-poster-brand">PATIENT&apos;S NAVIGATOR</span>
+            <div className="in-poster-cap">
+              {form.procedure_description.trim() || "Your care, sorted."}
+            </div>
+            <button
+              type="button"
+              className="in-poster-emoji"
+              onClick={shuffleTheme}
+              aria-label="Shuffle theme"
+            >
+              🩺
+            </button>
+          </div>
+          <div className="in-theme">
+            <div className="in-theme-card">
+              <span className="in-theme-swatch" style={{ backgroundImage: theme.swatch }} />
+              <span className="in-theme-meta">
+                <span className="in-theme-label">Theme</span>
+                <span className="in-theme-name">{theme.name}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              className="in-shuffle"
+              onClick={shuffleTheme}
+              aria-label="Shuffle theme"
+            >
+              ⇄
+            </button>
+          </div>
+        </aside>
 
-        <button type="submit" disabled={loading} style={styles.primaryButton}>
-          {loading ? "Checking coverage..." : "Run Insurance Check"}
-        </button>
-      </form>
+        <form onSubmit={submit} className="in-card in-reveal" style={{ animationDelay: "0.12s" }}>
+          <h1 className="in-title">
+            Estimate your <em>cost</em>.
+          </h1>
+          <p className="in-lede">
+            Verify coverage, compare real provider pricing, and trigger the booking call — before
+            you commit.
+          </p>
+          <div className="in-form">
+            <Field
+              label="Plan Name"
+              value={form.plan_name}
+              onChange={(v) => setField("plan_name", v)}
+              placeholder="Blue Cross PPO"
+              error={issueByField.get("plan_name")}
+            />
+            <Field
+              label="Member ID"
+              value={form.member_id}
+              onChange={(v) => setField("member_id", v)}
+              placeholder="MEM001"
+              error={issueByField.get("member_id")}
+            />
+            <Field
+              label="Group Number"
+              value={form.group_number}
+              onChange={(v) => setField("group_number", v)}
+              placeholder="GRP001"
+              error={issueByField.get("group_number")}
+            />
+            <Field
+              label="Procedure Description"
+              value={form.procedure_description}
+              onChange={(v) => setField("procedure_description", v)}
+              placeholder="My doctor said I need a knee MRI"
+              multiline
+              error={issueByField.get("procedure_description")}
+            />
+            <Field
+              label="Zip Code"
+              value={form.zip_code}
+              onChange={(v) => setField("zip_code", v)}
+              placeholder="94103"
+              error={issueByField.get("zip_code")}
+            />
+            <Field
+              label="Insurance + Booking Demo Number (Your Phone)"
+              value={form.callback_phone}
+              onChange={(v) => setField("callback_phone", v)}
+              placeholder="+12298293537"
+              error={issueByField.get("callback_phone")}
+            />
+            <label className="in-check">
+              <input
+                type="checkbox"
+                checked={form.save_insurance_info}
+                onChange={(e) => setField("save_insurance_info", e.target.checked)}
+              />
+              <span>Save my insurance info for future visits</span>
+            </label>
 
-      {serviceError && <div style={styles.errorBanner}>{serviceError}</div>}
+            <button type="submit" disabled={loading} className="in-btn in-btn-primary in-btn-block">
+              {loading ? "Checking coverage..." : "Run Insurance Check"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {serviceError && <div className="in-error">{serviceError}</div>}
 
       {result && (
-        <section style={styles.resultCard}>
-          <h2 style={styles.h2}>Coverage Snapshot</h2>
-          <div style={styles.row}>
-            <strong>CPT</strong>
-            <span>
-              {result.cpt.cpt_code} - {result.cpt.procedure_name}
-            </span>
-          </div>
-          <div style={styles.row}>
-            <strong>Covered</strong>
-            <span>{result.insurance_call_result.covered ? "Yes" : "No"}</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Deductible</strong>
-            <span>
-              ${result.insurance_call_result.deductible_met} met of $
-              {result.insurance_call_result.deductible_total} (
-              ${result.insurance_call_result.deductible_remaining} remaining)
-            </span>
-          </div>
-          <div style={styles.row}>
-            <strong>Coinsurance</strong>
-            <span>{result.insurance_call_result.coinsurance_percentage}%</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Facility Types</strong>
-            <span>{result.insurance_call_result.facility_types_covered.join(", ")}</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Resolved Phone</strong>
-            <span>{result.meta.resolved_member_services_phone}</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Adapter / Source</strong>
-            <span>{result.meta.adapter} / {result.meta.phone_resolution_source}</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Orchestration</strong>
-            <span>{result.meta.orchestration_mode}</span>
-          </div>
-          <div style={styles.row}>
-            <strong>Outbound Call</strong>
-            <span>
-              {result.meta.outbound_call.status === "triggered"
-                ? `Triggered${result.meta.outbound_call.call_sid ? ` (${result.meta.outbound_call.call_sid})` : ""}`
-                : result.meta.outbound_call.status === "failed"
-                  ? `Failed${result.meta.outbound_call.error ? `: ${result.meta.outbound_call.error}` : ""}`
-                  : "Skipped"}
-            </span>
+        <section className="in-card in-reveal in-results">
+          <p className="in-kicker">What we found</p>
+          <h2 className="in-h2">Coverage Snapshot</h2>
+          <div className="in-stats">
+            <div className="in-stat">
+              <span className="in-stat-key">CPT</span>
+              <span className="in-stat-val">
+                {result.cpt.cpt_code} - {result.cpt.procedure_name}
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Covered</span>
+              <span
+                className={
+                  result.insurance_call_result.covered
+                    ? "in-stat-val in-covered-yes"
+                    : "in-stat-val in-covered-no"
+                }
+              >
+                {result.insurance_call_result.covered ? "Yes" : "No"}
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Deductible</span>
+              <span className="in-stat-val">
+                ${result.insurance_call_result.deductible_met} met of $
+                {result.insurance_call_result.deductible_total} (
+                ${result.insurance_call_result.deductible_remaining} remaining)
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Coinsurance</span>
+              <span className="in-stat-val">{result.insurance_call_result.coinsurance_percentage}%</span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Facility Types</span>
+              <span className="in-stat-val">
+                {result.insurance_call_result.facility_types_covered.join(", ")}
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Resolved Phone</span>
+              <span className="in-stat-val in-stat-val--mono">
+                {result.meta.resolved_member_services_phone}
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Adapter / Source</span>
+              <span className="in-stat-val in-stat-val--mono">
+                {result.meta.adapter} / {result.meta.phone_resolution_source}
+              </span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Orchestration</span>
+              <span className="in-stat-val in-stat-val--mono">{result.meta.orchestration_mode}</span>
+            </div>
+            <div className="in-stat">
+              <span className="in-stat-key">Outbound Call</span>
+              <span className="in-stat-val in-stat-val--mono">
+                {result.meta.outbound_call.status === "triggered"
+                  ? `Triggered${result.meta.outbound_call.call_sid ? ` (${result.meta.outbound_call.call_sid})` : ""}`
+                  : result.meta.outbound_call.status === "failed"
+                    ? `Failed${result.meta.outbound_call.error ? `: ${result.meta.outbound_call.error}` : ""}`
+                    : "Skipped"}
+              </span>
+            </div>
           </div>
 
           {timelineItems.length > 0 && (
-            <div style={styles.timelineCard}>
-              <h3 style={styles.h3}>Live Call Timeline</h3>
-              <div style={styles.timelineList}>
+            <div className="in-timeline">
+              <h3 className="in-h3" style={{ marginTop: 0 }}>Live Call Timeline</h3>
+              <div className="in-timeline-list">
                 {timelineItems.map((item) => (
-                  <div key={item.stage} style={styles.timelineRow}>
-                    <span style={styles.timelineStage}>{item.label}</span>
-                    <span style={styles.timelineStatus}>{stageStatusLabel(item.status)}</span>
-                    {item.detail && <span style={styles.timelineDetail}>{item.detail}</span>}
+                  <div key={item.stage} className="in-timeline-row" data-status={item.status}>
+                    <span className="in-timeline-stage">{item.label}</span>
+                    <span className="in-pill" data-status={item.status}>
+                      {stageStatusLabel(item.status)}
+                    </span>
+                    {item.detail && <span className="in-timeline-detail">{item.detail}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <h3 style={styles.h3}>Providers (lowest estimated cost first)</h3>
-          <div style={styles.providerList}>
+          <h3 className="in-h3">Providers (lowest estimated cost first)</h3>
+          <div className="in-providers">
             {result.providers_ranked.map((provider) => {
               const isRecommended = provider.provider_id === result.recommended_provider_id;
               const isSelected = provider.provider_id === selectedProviderId;
               return (
-                <label key={provider.provider_id} style={styles.providerCard}>
-                  <div style={styles.providerHeader}>
+                <label key={provider.provider_id} className="in-provider" data-selected={isSelected}>
+                  <div className="in-provider-head">
                     <input
                       type="radio"
                       name="selected-provider"
                       checked={isSelected}
                       onChange={() => setSelectedProviderId(provider.provider_id)}
                     />
-                    <strong>{provider.provider_name}</strong>
-                    {isRecommended && <span style={styles.badge}>Recommended</span>}
+                    <span className="in-provider-name">{provider.provider_name}</span>
+                    {isRecommended && <span className="in-badge">Recommended</span>}
                   </div>
-                  <div style={styles.providerMeta}>{provider.address}</div>
-                  <div style={styles.providerMeta}>Call Number: {provider.phone}</div>
-                  <div style={styles.providerMeta}>Procedure Price: ${provider.procedure_price}</div>
-                  <div style={styles.providerCost}>
-                    Estimated Patient Cost: ${provider.estimated_patient_cost}
+                  <div className="in-provider-meta">{provider.address}</div>
+                  <div className="in-provider-meta">Call Number: {provider.phone}</div>
+                  <div className="in-provider-meta">Procedure Price: ${provider.procedure_price}</div>
+                  <div className="in-provider-cost">
+                    Estimated Patient Cost: <b>${provider.estimated_patient_cost}</b>
                   </div>
                 </label>
               );
             })}
           </div>
 
-          <div style={styles.bookingCard}>
-            <h3 style={styles.h3}>Book Appointment</h3>
-            <label style={styles.fieldWrap}>
-              <span style={styles.fieldLabel}>Preferred Date / Time</span>
+          <div className="in-booking">
+            <h3 className="in-h3" style={{ marginTop: 0 }}>Book Appointment</h3>
+            <label className="in-field">
+              <span className="in-label">Preferred Date / Time</span>
               <input
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
                 placeholder="Thu 4:00 PM"
-                style={styles.input}
+                className="in-input"
               />
             </label>
-            <button type="button" onClick={bookSelectedProvider} style={styles.primaryButton}>
+            <button type="button" onClick={bookSelectedProvider} className="in-btn in-btn-primary">
               {bookingLoading ? "Calling provider to book..." : "Book Selected Provider"}
             </button>
-            {bookingError && <div style={styles.bookingError}>{bookingError}</div>}
+            {bookingError && <div className="in-error" style={{ marginTop: 0 }}>{bookingError}</div>}
             {bookingResult && !bookingCallTrigger && (
-              <div style={styles.bookingSuccess}>
+              <div className="in-booking-success">
                 {bookingCallLoading
                   ? `Calling your number now (as the provider scheduler) to book ${bookingResult.provider_name}...`
                   : `Ready to book ${bookingResult.provider_name} for ${bookingResult.scheduled_for}.`}
               </div>
             )}
             {bookingCallTrigger && bookingCallTrigger.status === "failed" && (
-              <div style={styles.bookingError}>
+              <div className="in-error" style={{ marginTop: 0 }}>
                 Booking call failed
                 {bookingCallTrigger.error ? `: ${bookingCallTrigger.error}` : ""}.
               </div>
             )}
             {bookingCallTrigger && bookingCallTrigger.status === "triggered" && bookingResult && (
-              <div style={styles.confirmationCard}>
-                <div style={styles.confirmationHeader}>Appointment Confirmed</div>
-                <div style={styles.confirmationRow}>
-                  <span style={styles.confirmationLabel}>Provider</span>
-                  <span style={styles.confirmationValue}>{bookingResult.provider_name}</span>
+              <div className="in-confirmation">
+                <div className="in-confirmation-head">Appointment Confirmed</div>
+                <div className="in-confirmation-row">
+                  <span className="in-confirmation-label">Provider</span>
+                  <span className="in-confirmation-value">{bookingResult.provider_name}</span>
                 </div>
                 {result?.cpt?.procedure_name && (
-                  <div style={styles.confirmationRow}>
-                    <span style={styles.confirmationLabel}>Procedure</span>
-                    <span style={styles.confirmationValue}>{result.cpt.procedure_name}</span>
+                  <div className="in-confirmation-row">
+                    <span className="in-confirmation-label">Procedure</span>
+                    <span className="in-confirmation-value">{result.cpt.procedure_name}</span>
                   </div>
                 )}
-                <div style={styles.confirmationRow}>
-                  <span style={styles.confirmationLabel}>Date / Time</span>
-                  <span style={styles.confirmationValue}>
+                <div className="in-confirmation-row">
+                  <span className="in-confirmation-label">Date / Time</span>
+                  <span className="in-confirmation-value">
                     {bookingCallTrigger.scheduled_for || bookingResult.scheduled_for}
                   </span>
                 </div>
                 {(bookingCallTrigger.confirmation_id || bookingResult.confirmation_id) && (
-                  <div style={styles.confirmationRow}>
-                    <span style={styles.confirmationLabel}>Confirmation</span>
-                    <span style={styles.confirmationValue}>
+                  <div className="in-confirmation-row">
+                    <span className="in-confirmation-label">Confirmation</span>
+                    <span className="in-confirmation-value">
                       {bookingCallTrigger.confirmation_id || bookingResult.confirmation_id}
                     </span>
                   </div>
                 )}
                 {bookingCallTrigger.call_sid && (
-                  <div style={styles.confirmationRow}>
-                    <span style={styles.confirmationLabel}>Call ID</span>
-                    <span style={styles.confirmationValue}>{bookingCallTrigger.call_sid}</span>
+                  <div className="in-confirmation-row">
+                    <span className="in-confirmation-label">Call ID</span>
+                    <span className="in-confirmation-value">{bookingCallTrigger.call_sid}</span>
                   </div>
                 )}
-                <div style={styles.confirmationNote}>
+                <div className="in-confirmation-note">
                   A confirmation call was placed to your number. The agent confirmed these details
                   with the scheduler.
                 </div>
               </div>
             )}
             {bookingResult && (
-              <button type="button" onClick={triggerBookingCall} style={styles.secondaryButton}>
+              <button type="button" onClick={triggerBookingCall} className="in-btn in-btn-secondary">
                 {bookingCallLoading ? "Calling to book..." : "Re-trigger Booking Call"}
               </button>
             )}
@@ -737,260 +849,25 @@ function Field({
   multiline?: boolean;
 }) {
   return (
-    <label style={styles.fieldWrap}>
-      <span style={styles.fieldLabel}>{label}</span>
+    <label className="in-field">
+      <span className="in-label">{label}</span>
       {multiline ? (
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={3}
-          style={styles.textarea}
+          className="in-textarea"
         />
       ) : (
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          style={styles.input}
+          className="in-input"
         />
       )}
-      {error && <span style={styles.fieldError}>{error}</span>}
+      {error && <span className="in-field-error">{error}</span>}
     </label>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    maxWidth: 900,
-    margin: "0 auto",
-    padding: "36px 20px 72px",
-  },
-  header: { marginBottom: 18 },
-  h1: { fontSize: 30, margin: 0 },
-  h2: { marginTop: 0, marginBottom: 14, fontSize: 22 },
-  h3: { margin: "16px 0 10px", fontSize: 18 },
-  subtle: { color: "#9ca3af", marginTop: 8, lineHeight: 1.5 },
-  savedBanner: {
-    marginBottom: 12,
-    background: "#11243a",
-    border: "1px solid #3b82f6",
-    borderRadius: 10,
-    padding: "10px 12px",
-    color: "#bfdbfe",
-    fontSize: 14,
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "center",
-  },
-  clearButton: {
-    border: "1px solid #3b82f6",
-    background: "transparent",
-    color: "#bfdbfe",
-    borderRadius: 8,
-    padding: "6px 10px",
-    cursor: "pointer",
-  },
-  formCard: {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 12,
-    padding: 16,
-    display: "grid",
-    gap: 12,
-  },
-  fieldWrap: { display: "grid", gap: 6 },
-  fieldLabel: { fontSize: 13, color: "#9ca3af" },
-  input: {
-    background: "#0e0e16",
-    color: "#e7e7ef",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 14,
-  },
-  textarea: {
-    background: "#0e0e16",
-    color: "#e7e7ef",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 14,
-    resize: "vertical",
-  },
-  fieldError: { color: "#fda4af", fontSize: 12 },
-  checkboxWrap: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 13,
-    color: "#d1d5db",
-  },
-  primaryButton: {
-    marginTop: 4,
-    background: "#6ea8fe",
-    color: "#06122a",
-    border: "none",
-    borderRadius: 8,
-    padding: "11px 16px",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  errorBanner: {
-    marginTop: 14,
-    background: "#3a1620",
-    border: "1px solid #e08a8a",
-    borderRadius: 10,
-    padding: 12,
-    color: "#fda4af",
-  },
-  resultCard: {
-    marginTop: 16,
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 12,
-    padding: 16,
-  },
-  row: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 16,
-    padding: "6px 0",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-    fontSize: 14,
-  },
-  recommendation: {
-    marginTop: 14,
-    marginBottom: 0,
-    color: "#6ee7a8",
-    fontWeight: 600,
-  },
-  providerList: {
-    display: "grid",
-    gap: 10,
-  },
-  providerCard: {
-    background: "rgba(255,255,255,0.02)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 10,
-    padding: 12,
-    display: "grid",
-    gap: 6,
-  },
-  providerHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  badge: {
-    fontSize: 11,
-    padding: "2px 8px",
-    borderRadius: 999,
-    border: "1px solid #22c55e",
-    color: "#86efac",
-  },
-  providerMeta: {
-    color: "#d1d5db",
-    fontSize: 13,
-  },
-  providerCost: {
-    color: "#6ee7a8",
-    fontWeight: 600,
-  },
-  bookingCard: {
-    marginTop: 14,
-    borderTop: "1px solid rgba(255,255,255,0.08)",
-    paddingTop: 12,
-    display: "grid",
-    gap: 10,
-  },
-  bookingError: {
-    color: "#fda4af",
-    fontSize: 13,
-  },
-  bookingSuccess: {
-    background: "#0f2f21",
-    border: "1px solid #22c55e",
-    borderRadius: 8,
-    padding: "8px 10px",
-    color: "#bbf7d0",
-    fontSize: 14,
-  },
-  secondaryButton: {
-    marginTop: 4,
-    background: "transparent",
-    color: "#9ec1ff",
-    border: "1px solid rgba(110,168,254,0.5)",
-    borderRadius: 8,
-    padding: "9px 14px",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  confirmationCard: {
-    background: "linear-gradient(180deg, #0f2f21 0%, #0c2419 100%)",
-    border: "1px solid #22c55e",
-    borderRadius: 12,
-    padding: "14px 16px",
-    display: "grid",
-    gap: 8,
-  },
-  confirmationHeader: {
-    color: "#bbf7d0",
-    fontSize: 16,
-    fontWeight: 700,
-    letterSpacing: 0.2,
-  },
-  confirmationRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    fontSize: 14,
-  },
-  confirmationLabel: {
-    color: "#86efac",
-    opacity: 0.85,
-  },
-  confirmationValue: {
-    color: "#f0fff7",
-    fontWeight: 600,
-    textAlign: "right" as const,
-  },
-  confirmationNote: {
-    marginTop: 4,
-    color: "#a7f3d0",
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  timelineCard: {
-    marginTop: 14,
-    background: "rgba(17, 36, 58, 0.35)",
-    border: "1px solid rgba(147,197,253,0.4)",
-    borderRadius: 10,
-    padding: 12,
-  },
-  timelineList: {
-    display: "grid",
-    gap: 8,
-  },
-  timelineRow: {
-    display: "grid",
-    gap: 3,
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-    paddingBottom: 8,
-  },
-  timelineStage: {
-    fontSize: 13,
-    color: "#dbeafe",
-    fontWeight: 600,
-  },
-  timelineStatus: {
-    fontSize: 13,
-    color: "#93c5fd",
-  },
-  timelineDetail: {
-    fontSize: 12,
-    color: "#9ca3af",
-    wordBreak: "break-word",
-  },
-};

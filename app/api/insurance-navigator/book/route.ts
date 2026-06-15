@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { runInsuranceNavigatorBooking } from "@/features/insurance-navigator/orchestrator/runInsuranceNavigatorBooking";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
 };

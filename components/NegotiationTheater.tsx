@@ -14,14 +14,14 @@ const LABEL: Record<string, string> = {
 };
 
 const INTENT_COLOR: Record<string, string> = {
-  "coverage.request": "#6ea8fe",
-  "coverage.offer": "#e08a8a",
-  "coverage.dispute": "#f5c451",
-  "coverage.settle": "#6ee7a8",
-  "schedule.request": "#6ea8fe",
-  "schedule.offer": "#e08a8a",
-  "schedule.counter": "#f5c451",
-  "schedule.confirm": "#6ee7a8",
+  "coverage.request": "var(--blue)",
+  "coverage.offer": "var(--ink)",
+  "coverage.dispute": "var(--blue)",
+  "coverage.settle": "var(--blue)",
+  "schedule.request": "var(--blue)",
+  "schedule.offer": "var(--ink)",
+  "schedule.counter": "var(--blue)",
+  "schedule.confirm": "var(--blue)",
 };
 
 export default function NegotiationTheater({
@@ -84,7 +84,7 @@ function Column({
           fontSize: 12,
           letterSpacing: 1,
           textTransform: "uppercase",
-          color: "#8a8aa0",
+          color: "var(--ink-soft)",
           marginBottom: 4,
         }}
       >
@@ -112,7 +112,7 @@ function Bubble({ m }: { m: A2AMessage }) {
         <span
           style={{
             fontSize: 10,
-            color: INTENT_COLOR[m.intent] ?? "#8a8aa0",
+            color: INTENT_COLOR[m.intent] ?? "var(--ink-soft)",
             fontFamily: "monospace",
           }}
         >

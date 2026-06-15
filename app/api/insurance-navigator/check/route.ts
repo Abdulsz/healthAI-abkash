@@ -3,6 +3,9 @@ import * as insuranceCheckOrchestrator from "../../../../features/insurance-navi
 import { ServiceErrorResponse } from "../../../../features/insurance-navigator/domain/contracts";
 import { InsuranceAdapterExecutionError } from "../../../../features/insurance-navigator/domain/errors";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
 };

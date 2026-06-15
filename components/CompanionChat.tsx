@@ -66,7 +66,7 @@ export default function CompanionChat() {
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
         {turns.length === 0 && (
-          <div style={{ color: "#8a8aa0", fontSize: 14 }}>
+          <div style={{ color: "var(--ink-soft)", fontSize: 14 }}>
             It&apos;s 11pm and the clinic is closed. Ask your agent — it answers from
             your own session notes.
           </div>
@@ -77,8 +77,9 @@ export default function CompanionChat() {
             style={{
               alignSelf: t.role === "user" ? "flex-end" : "flex-start",
               maxWidth: "85%",
-              background: t.role === "user" ? "#1e2a44" : t.escalation ? "#3a1620" : "#16221a",
-              border: `1px solid ${t.escalation ? "#e08a8a" : "var(--border)"}`,
+              background: t.role === "user" ? "var(--blue)" : "rgba(49, 95, 239, 0.055)",
+              color: t.role === "user" ? "var(--white)" : "var(--ink)",
+              border: `1px solid ${t.escalation ? "var(--ink)" : "var(--border)"}`,
               borderRadius: 10,
               padding: "9px 12px",
               fontSize: 14,
@@ -87,7 +88,7 @@ export default function CompanionChat() {
           >
             {t.text}
             {t.citation && (
-              <div style={{ marginTop: 6, fontSize: 11, color: "#6ee7a8" }}>
+              <div style={{ marginTop: 6, fontSize: 11, color: t.role === "user" ? "var(--white)" : "var(--blue)" }}>
                 ↳ source: {t.citation}
               </div>
             )}
@@ -103,7 +104,7 @@ export default function CompanionChat() {
             disabled={busy}
             style={{
               fontSize: 12,
-              color: "#a0a0b8",
+              color: "var(--ink-soft)",
               background: "transparent",
               border: "1px solid var(--border)",
               borderRadius: 999,
@@ -129,11 +130,11 @@ export default function CompanionChat() {
           placeholder="Ask your care companion…"
           style={{
             flex: 1,
-            background: "#0e0e16",
+            background: "var(--white)",
             border: "1px solid var(--border)",
             borderRadius: 8,
             padding: "10px 12px",
-            color: "#e7e7ef",
+            color: "var(--ink)",
             fontSize: 14,
           }}
         />
@@ -141,8 +142,8 @@ export default function CompanionChat() {
           type="submit"
           disabled={busy}
           style={{
-            background: "#6ea8fe",
-            color: "#06122a",
+            background: "var(--blue)",
+            color: "var(--white)",
             border: "none",
             borderRadius: 8,
             padding: "10px 16px",

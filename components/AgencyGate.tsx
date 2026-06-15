@@ -18,12 +18,12 @@ export default function AgencyGate({
     <div
       style={{
         background: "var(--panel)",
-        border: "1px solid #6ee7a8",
+        border: "1px solid var(--blue)",
         borderRadius: 12,
         padding: 18,
       }}
     >
-      <div style={{ fontSize: 13, color: "#6ee7a8", marginBottom: 10 }}>
+      <div style={{ fontSize: 13, color: "var(--blue)", marginBottom: 10 }}>
         ✓ Your agent negotiated this for you — your call
       </div>
 
@@ -31,14 +31,14 @@ export default function AgencyGate({
         {coverage.status === "covered" ? "Covered" : coverage.status}
         {coverage.copay != null && ` · $${coverage.copay} copay`}
         {coverage.parityInvoked && (
-          <span style={{ color: "#f5c451" }}> · parity enforced</span>
+          <span style={{ color: "var(--blue)" }}> · parity enforced</span>
         )}
       </Row>
       <Row k="Provider">{appointment.provider}</Row>
       <Row k="When">{appointment.datetime}</Row>
       <Row k="How">{appointment.modality}</Row>
 
-      <div style={{ fontSize: 13, color: "#a0a0b8", margin: "12px 0 16px" }}>
+      <div style={{ fontSize: 13, color: "var(--ink-soft)", margin: "12px 0 16px" }}>
         {coverage.rationale}
       </div>
 
@@ -46,8 +46,8 @@ export default function AgencyGate({
         <button
           onClick={onBook}
           style={{
-            background: "#6ee7a8",
-            color: "#06210f",
+            background: "var(--blue)",
+            color: "var(--white)",
             border: "none",
             borderRadius: 8,
             padding: "10px 18px",
@@ -60,7 +60,7 @@ export default function AgencyGate({
         <button
           style={{
             background: "transparent",
-            color: "#a0a0b8",
+            color: "var(--ink-soft)",
             border: "1px solid var(--border)",
             borderRadius: 8,
             padding: "10px 18px",
@@ -77,7 +77,7 @@ export default function AgencyGate({
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: 10, padding: "4px 0", fontSize: 15 }}>
-      <span style={{ width: 90, color: "#8a8aa0" }}>{k}</span>
+      <span style={{ width: 90, color: "var(--ink-soft)" }}>{k}</span>
       <span>{children}</span>
     </div>
   );
