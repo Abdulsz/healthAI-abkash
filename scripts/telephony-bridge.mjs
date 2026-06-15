@@ -7,8 +7,15 @@ import nextEnv from "@next/env";
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
-const BRIDGE_PORT = Number(process.env.TELEPHONY_BRIDGE_PORT || 8788);
-const PUBLIC_BASE_URL = (process.env.TELEPHONY_PUBLIC_BASE_URL || "").trim();
+// Hosts like Render/Railway/Fly inject PORT; fall back to our own var, then a dev default.
+const BRIDGE_PORT = Number(process.env.PORT || process.env.TELEPHONY_BRIDGE_PORT || 8788);
+// Prefer an explicit public URL; on Render, RENDER_EXTERNAL_URL is auto-provided so the
+// service works on first deploy without manually wiring its own URL back to itself.
+const PUBLIC_BASE_URL = (
+  process.env.TELEPHONY_PUBLIC_BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  ""
+).trim();
 const XAI_API_KEY = (process.env.XAI_API_KEY || process.env.LLM_API_KEY || "").trim();
 const XAI_MODEL = (process.env.INS_NAV_GROK_VOICE_MODEL || "grok-voice-think-fast-1.1").trim();
 const VOICE_NAME = (process.env.INS_NAV_GROK_VOICE_NAME || "sal").trim();

@@ -1,0 +1,30 @@
+# Render Blueprint for the Twilio <-> xAI realtime telephony bridge.
+# This is a SEPARATE always-on service from the Next.js app (which deploys to Vercel).
+# Deploy: Render Dashboard -> New -> Blueprint -> point at this repo.
+services:
+  - type: web
+    name: telephony-bridge
+    runtime: node
+    plan: free # upgrade to "starter" to avoid cold-start spin-down between calls
+    # Only the bridge + its deps are needed; we skip `next build`.
+    buildCommand: npm install
+    startCommand: node scripts/telephony-bridge.mjs
+    healthCheckPath: /health
+    envVars:
+      # PUBLIC base URL is auto-derived from RENDER_EXTERNAL_URL at runtime,
+      # so you do NOT need to set TELEPHONY_PUBLIC_BASE_URL here.
+      - key: XAI_API_KEY
+        sync: false
+      - key: INS_NAV_GROK_VOICE_MODEL
+        value: grok-voice-think-fast-1.1
+      - key: INS_NAV_GROK_VOICE_NAME
+        value: sal
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      # Optional: extra call-agent instructions appended to every live call.
+      - key: TELEPHONY_AGENT_INSTRUCTIONS
+        sync: false
