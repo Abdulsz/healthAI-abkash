@@ -17,7 +17,7 @@ const PUBLIC_BASE_URL = (
   ""
 ).trim();
 const XAI_API_KEY = (process.env.XAI_API_KEY || process.env.LLM_API_KEY || "").trim();
-const XAI_MODEL = (process.env.INS_NAV_GROK_VOICE_MODEL || "grok-voice-think-fast-1.1").trim();
+const XAI_MODEL = (process.env.INS_NAV_GROK_VOICE_MODEL || "grok-voice-think-fast-1.0").trim();
 const VOICE_NAME = (process.env.INS_NAV_GROK_VOICE_NAME || "sal").trim();
 
 const DEFAULT_AGENT_INSTRUCTIONS = [

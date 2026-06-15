@@ -16,7 +16,7 @@ services:
       - key: XAI_API_KEY
         sync: false
       - key: INS_NAV_GROK_VOICE_MODEL
-        value: grok-voice-think-fast-1.1
+        value: grok-voice-think-fast-1.0
       - key: INS_NAV_GROK_VOICE_NAME
         value: sal
       - key: TWILIO_ACCOUNT_SID
