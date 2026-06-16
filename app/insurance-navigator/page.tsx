@@ -926,22 +926,6 @@ export default function InsuranceNavigatorPage() {
               )}
             </div>
             <div className="in-stat">
-              <span className="in-stat-key">Resolved Phone</span>
-              <span className="in-stat-val in-stat-val--mono">
-                {result.meta.resolved_member_services_phone}
-              </span>
-            </div>
-            <div className="in-stat">
-              <span className="in-stat-key">Adapter / Source</span>
-              <span className="in-stat-val in-stat-val--mono">
-                {result.meta.adapter} / {result.meta.phone_resolution_source}
-              </span>
-            </div>
-            <div className="in-stat">
-              <span className="in-stat-key">Orchestration</span>
-              <span className="in-stat-val in-stat-val--mono">{result.meta.orchestration_mode}</span>
-            </div>
-            <div className="in-stat">
               <span className="in-stat-key">Outbound Call</span>
               <span className="in-stat-val in-stat-val--mono">
                 {result.meta.outbound_call.status === "triggered"

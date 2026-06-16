@@ -62,7 +62,6 @@ describe("InsuranceNavigatorPage", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Coverage Snapshot")).toBeTruthy();
     expect(screen.getByText("73721 - MRI lower extremity joint")).toBeTruthy();
-    expect(screen.getByText("mock / static_lookup")).toBeTruthy();
   });
 
   it("shows inline validation issues for 400 validation_error responses", async () => {
