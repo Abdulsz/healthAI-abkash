@@ -20,6 +20,217 @@ const XAI_API_KEY = (process.env.XAI_API_KEY || process.env.LLM_API_KEY || "").t
 const XAI_MODEL = (process.env.INS_NAV_GROK_VOICE_MODEL || "grok-voice-think-fast-1.0").trim();
 const VOICE_NAME = (process.env.INS_NAV_GROK_VOICE_NAME || "sal").trim();
 
+// Text model used to extract a structured coverage result from the live call transcript.
+const EXTRACTION_API_KEY = (process.env.LLM_API_KEY || process.env.XAI_API_KEY || "").trim();
+const EXTRACTION_BASE_URL = (process.env.LLM_BASE_URL || "https://api.x.ai/v1")
+  .trim()
+  .replace(/\/$/, "");
+const EXTRACTION_MODEL = (process.env.LLM_MODEL || "grok-3").trim();
+
+// In-memory store of live-call outcomes keyed by Twilio Call SID. The Next.js app polls
+// these via GET /twilio/call-result?callSid=... and swaps the AI estimate for the real
+// transcript-derived result once the call ends. Entries auto-expire to bound memory.
+const callResults = new Map();
+const CALL_RESULT_TTL_MS = 30 * 60 * 1000;
+
+function setCallResult(callSid, patch) {
+  if (!callSid) {
+    return;
+  }
+  const existing = callResults.get(callSid) || {};
+  callResults.set(callSid, { ...existing, ...patch, updatedAt: Date.now() });
+}
+
+function getCallResult(callSid) {
+  return callSid ? callResults.get(callSid) || null : null;
+}
+
+function pruneCallResults() {
+  const cutoff = Date.now() - CALL_RESULT_TTL_MS;
+  for (const [sid, entry] of callResults.entries()) {
+    if ((entry.updatedAt || 0) < cutoff) {
+      callResults.delete(sid);
+    }
+  }
+}
+
+function clampNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+}
+
+function normalizeFacilityTypes(value) {
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/,| and /i)
+      : [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const entry = String(raw)
+      .replace(/[\[\]"'{}]/g, "")
+      .trim();
+    if (entry && !entry.includes(":") && !seen.has(entry.toLowerCase())) {
+      seen.add(entry.toLowerCase());
+      out.push(entry);
+    }
+  }
+  return out;
+}
+
+function coerceInsuranceCallResult(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const deductibleTotal = clampNumber(parsed.deductible_total);
+  const deductibleMet = clampNumber(parsed.deductible_met);
+  const deductibleRemaining =
+    parsed.deductible_remaining == null
+      ? Math.max(0, deductibleTotal - deductibleMet)
+      : clampNumber(parsed.deductible_remaining);
+  const coveredRaw =
+    typeof parsed.covered === "string"
+      ? ["true", "yes", "covered"].includes(parsed.covered.toLowerCase())
+      : Boolean(parsed.covered);
+
+  return {
+    covered: coveredRaw,
+    deductible_total: deductibleTotal,
+    deductible_met: deductibleMet,
+    deductible_remaining: deductibleRemaining,
+    coinsurance_percentage: clampNumber(parsed.coinsurance_percentage),
+    facility_types_covered: normalizeFacilityTypes(parsed.facility_types_covered),
+  };
+}
+
+async function extractInsuranceResultFromTranscript(transcript) {
+  if (!EXTRACTION_API_KEY || !transcript.trim()) {
+    return null;
+  }
+
+  const response = await fetch(`${EXTRACTION_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${EXTRACTION_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: EXTRACTION_MODEL,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You extract structured insurance benefits from a phone call transcript.",
+            "The transcript is between an insurance navigator agent and a member-services representative.",
+            "Use ONLY facts stated by the representative. Do not invent numbers.",
+            "If a value was not stated, use 0 for numbers, false for covered, and [] for facility types.",
+            'Return ONLY valid JSON matching: {"covered":boolean,"deductible_total":number,"deductible_met":number,"deductible_remaining":number,"coinsurance_percentage":number,"facility_types_covered":string[]}',
+          ].join(" "),
+        },
+        { role: "user", content: `Transcript:\n${transcript}` },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Extraction model returned HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") {
+    return null;
+  }
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) {
+      parsed = JSON.parse(match[0]);
+    }
+  }
+  return coerceInsuranceCallResult(parsed);
+}
+
+function coerceBookingResult(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const confirmationId =
+    typeof parsed.confirmation_id === "string" ? parsed.confirmation_id.trim() : "";
+  const scheduledFor =
+    typeof parsed.scheduled_for === "string" ? parsed.scheduled_for.trim() : "";
+  const bookedRaw =
+    typeof parsed.booked === "string"
+      ? ["true", "yes", "booked", "confirmed"].includes(parsed.booked.toLowerCase())
+      : Boolean(parsed.booked);
+
+  // Treat the call as a real booking only if the scheduler actually committed to a slot.
+  return {
+    confirmation_id: confirmationId,
+    scheduled_for: scheduledFor,
+    booked: bookedRaw || Boolean(confirmationId || scheduledFor),
+  };
+}
+
+async function extractBookingResultFromTranscript(transcript) {
+  if (!EXTRACTION_API_KEY || !transcript.trim()) {
+    return null;
+  }
+
+  const response = await fetch(`${EXTRACTION_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${EXTRACTION_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: EXTRACTION_MODEL,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You extract the appointment booking outcome from a phone call transcript.",
+            "The transcript is between an insurance navigator agent and a provider scheduler.",
+            "Use ONLY facts stated by the scheduler. Do not invent a confirmation number or time.",
+            "If the scheduler did not give a value, return an empty string for it.",
+            'Return ONLY valid JSON matching: {"confirmation_id":string,"scheduled_for":string,"booked":boolean}',
+          ].join(" "),
+        },
+        { role: "user", content: `Transcript:\n${transcript}` },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Extraction model returned HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") {
+    return null;
+  }
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) {
+      parsed = JSON.parse(match[0]);
+    }
+  }
+  return coerceBookingResult(parsed);
+}
+
 const DEFAULT_AGENT_INSTRUCTIONS = [
   "You are the Insurance Navigator call agent placing an OUTBOUND call on behalf of a patient/member.",
   "You are currently in a live phone call.",
@@ -230,6 +441,28 @@ const server = createServer(async (req, res) => {
     });
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/twilio/call-result") {
+    const callSid = (requestUrl.searchParams.get("callSid") || "").trim();
+    pruneCallResults();
+    const entry = getCallResult(callSid);
+    if (!entry) {
+      return jsonResponse(res, 200, {
+        call_sid: callSid,
+        stage: "",
+        status: "not_found",
+      });
+    }
+    return jsonResponse(res, 200, {
+      call_sid: callSid,
+      stage: entry.stage || "",
+      status: entry.status || "pending",
+      result: entry.result,
+      booking: entry.booking,
+      transcript: entry.transcript,
+      error: entry.error,
+    });
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/twilio/voice") {
     if (!PUBLIC_BASE_URL) {
       return jsonResponse(res, 500, {
@@ -345,10 +578,81 @@ mediaWss.on("connection", (twilioSocket, req) => {
   let stage = requestUrl.searchParams.get("stage") || "";
   let brief = requestUrl.searchParams.get("brief") || "";
   let streamSid = "";
+  let callSid = "";
   let xaiSocket = null;
   let xaiReady = false;
   let sessionConfigured = false;
+  let finalized = false;
+  let agentTranscriptBuffer = "";
+  const transcriptLines = [];
   const pendingAudioChunks = [];
+
+  async function finalizeCall() {
+    if (finalized) {
+      return;
+    }
+    finalized = true;
+    if (!callSid) {
+      return;
+    }
+
+    const transcript = transcriptLines.join("\n").trim();
+    // Only the insurance-verification and booking stages map to structured results we
+    // surface in the UI. Other stages just retain the transcript.
+    if (stage !== "insurance_verification" && stage !== "booking") {
+      setCallResult(callSid, { stage, status: "ready", transcript });
+      return;
+    }
+
+    if (!transcript) {
+      setCallResult(callSid, {
+        stage,
+        status: "failed",
+        transcript,
+        error: "No transcript was captured from the live call.",
+      });
+      return;
+    }
+
+    setCallResult(callSid, { stage, status: "pending", transcript });
+    try {
+      if (stage === "booking") {
+        const booking = await extractBookingResultFromTranscript(transcript);
+        if (booking) {
+          setCallResult(callSid, { stage, status: "ready", transcript, booking });
+          console.log(`[telephony-bridge ${streamId}] extracted live booking for callSid=${callSid}`);
+        } else {
+          setCallResult(callSid, {
+            stage,
+            status: "failed",
+            transcript,
+            error: "Could not extract booking outcome from transcript.",
+          });
+        }
+        return;
+      }
+
+      const result = await extractInsuranceResultFromTranscript(transcript);
+      if (result) {
+        setCallResult(callSid, { stage, status: "ready", transcript, result });
+        console.log(`[telephony-bridge ${streamId}] extracted live coverage for callSid=${callSid}`);
+      } else {
+        setCallResult(callSid, {
+          stage,
+          status: "failed",
+          transcript,
+          error: "Could not extract structured coverage from transcript.",
+        });
+      }
+    } catch (error) {
+      setCallResult(callSid, {
+        stage,
+        status: "failed",
+        transcript,
+        error: error instanceof Error ? error.message : "Transcript extraction failed.",
+      });
+    }
+  }
 
   function configureAndKickoff() {
     if (!xaiSocket || xaiSocket.readyState !== WebSocket.OPEN) {
@@ -376,7 +680,12 @@ mediaWss.on("connection", (twilioSocket, req) => {
             .join(" "),
           turn_detection: { type: "server_vad" },
           audio: {
-            input: { format: { type: "audio/pcmu" } },
+            input: {
+              format: { type: "audio/pcmu" },
+              // Transcribe the representative's speech so we can extract the real
+              // coverage answers from the call (best-effort; ignored if unsupported).
+              transcription: { model: "whisper-1" },
+            },
             output: { format: { type: "audio/pcmu" } },
           },
         },
@@ -434,6 +743,29 @@ mediaWss.on("connection", (twilioSocket, req) => {
     }
 
     const eventType = event?.type || "";
+
+    // Capture both sides of the conversation for transcript-based extraction.
+    // Agent speech: response.(output_)audio_transcript.delta/.done
+    // Representative speech: conversation.item.input_audio_transcription.completed
+    if (eventType.includes("transcript")) {
+      const isRepresentative = eventType.includes("input_audio_transcription");
+      if (!isRepresentative && typeof event?.delta === "string" && event.delta) {
+        agentTranscriptBuffer += event.delta;
+      }
+      if (eventType.endsWith(".done") || eventType.endsWith(".completed")) {
+        const full =
+          typeof event?.transcript === "string" && event.transcript.trim()
+            ? event.transcript.trim()
+            : agentTranscriptBuffer.trim();
+        if (full) {
+          transcriptLines.push(`${isRepresentative ? "Representative" : "Agent"}: ${full}`);
+        }
+        if (!isRepresentative) {
+          agentTranscriptBuffer = "";
+        }
+      }
+    }
+
     if (!streamSid) {
       return;
     }
@@ -489,8 +821,13 @@ mediaWss.on("connection", (twilioSocket, req) => {
       if (customParameters.brief) {
         brief = String(customParameters.brief);
       }
+      if (customParameters.callSid) {
+        callSid = String(customParameters.callSid);
+        // Mark the call as in-progress so pollers receive "pending" (not "not_found").
+        setCallResult(callSid, { stage, status: "pending" });
+      }
       console.log(
-        `[telephony-bridge ${streamId}] stream started ${streamSid} -> stage="${stage}"`
+        `[telephony-bridge ${streamId}] stream started ${streamSid} -> stage="${stage}" callSid=${callSid}`
       );
       while (pendingAudioChunks.length > 0 && twilioSocket.readyState === WebSocket.OPEN) {
         const payload = pendingAudioChunks.shift();
@@ -523,6 +860,7 @@ mediaWss.on("connection", (twilioSocket, req) => {
     }
 
     if (eventType === "stop") {
+      void finalizeCall();
       if (xaiSocket.readyState === WebSocket.OPEN) {
         xaiSocket.close();
       }
@@ -531,6 +869,7 @@ mediaWss.on("connection", (twilioSocket, req) => {
   });
 
   twilioSocket.on("close", () => {
+    void finalizeCall();
     if (xaiSocket && xaiSocket.readyState === WebSocket.OPEN) {
       xaiSocket.close();
     }
@@ -551,5 +890,6 @@ server.listen(BRIDGE_PORT, () => {
   console.log("[telephony-bridge] endpoints:");
   console.log("  POST /twilio/voice");
   console.log("  POST /twilio/outbound-call");
+  console.log("  GET  /twilio/call-result");
   console.log("  GET  /health");
 });

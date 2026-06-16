@@ -1,6 +1,10 @@
 "use client";
 
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  LIVE_CALL_RESULT_POLL_INTERVAL_MS,
+  LIVE_CALL_RESULT_POLL_MAX_ATTEMPTS,
+} from "@/features/insurance-navigator/config/constants";
 
 type IntakeForm = {
   plan_name: string;
@@ -167,6 +171,20 @@ export default function InsuranceNavigatorPage() {
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [liveCallSid, setLiveCallSid] = useState<string | null>(null);
+  const [liveCallStatus, setLiveCallStatus] = useState<
+    "idle" | "polling" | "ready" | "failed"
+  >("idle");
+  const [coverageSource, setCoverageSource] = useState<"ai_estimate" | "live_call">(
+    "ai_estimate"
+  );
+  const [bookingLiveSid, setBookingLiveSid] = useState<string | null>(null);
+  const [bookingLiveStatus, setBookingLiveStatus] = useState<
+    "idle" | "polling" | "ready" | "failed"
+  >("idle");
+  const [bookingSource, setBookingSource] = useState<"ai_estimate" | "live_call">(
+    "ai_estimate"
+  );
   const [preferredDate, setPreferredDate] = useState("");
   const [bookingResult, setBookingResult] = useState<BookingPayload | null>(null);
   const [bookingCallTrigger, setBookingCallTrigger] = useState<BookingCallTriggerPayload | null>(
@@ -177,6 +195,10 @@ export default function InsuranceNavigatorPage() {
   const [themeIdx, setThemeIdx] = useState(0);
 
   const theme = THEME_PRESETS[themeIdx];
+  // While a live verification call is in progress we must NOT show the AI estimate as if
+  // it were real coverage data. Hold the coverage fields until the live result lands.
+  const coveragePending = liveCallStatus === "polling";
+  const bookingPending = bookingLiveStatus === "polling";
   function shuffleTheme() {
     setThemeIdx((prev) => {
       if (THEME_PRESETS.length < 2) return prev;
@@ -216,6 +238,129 @@ export default function InsuranceNavigatorPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!liveCallSid || liveCallStatus !== "polling") {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    async function poll() {
+      attempts += 1;
+      try {
+        const response = await fetch(
+          `/api/insurance-navigator/call-result?call_sid=${encodeURIComponent(
+            liveCallSid as string
+          )}`,
+          { cache: "no-store" }
+        );
+        const payload = (await response.json()) as {
+          status?: string;
+          result?: RunPayload["insurance_call_result"];
+        };
+        if (cancelled) {
+          return;
+        }
+        if (payload.status === "ready" && payload.result) {
+          const liveResult = payload.result;
+          setResult((prev) =>
+            prev ? { ...prev, insurance_call_result: liveResult } : prev
+          );
+          setCoverageSource("live_call");
+          setLiveCallStatus("ready");
+          return;
+        }
+        if (payload.status === "failed") {
+          setLiveCallStatus("failed");
+          return;
+        }
+      } catch {
+        // Swallow transient polling errors; keep trying until the attempt budget runs out.
+      }
+      if (!cancelled && attempts >= LIVE_CALL_RESULT_POLL_MAX_ATTEMPTS) {
+        setLiveCallStatus("failed");
+      }
+    }
+
+    const timer = setInterval(() => {
+      if (liveCallStatus !== "polling") {
+        return;
+      }
+      void poll();
+    }, LIVE_CALL_RESULT_POLL_INTERVAL_MS);
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [liveCallSid, liveCallStatus]);
+
+  useEffect(() => {
+    if (!bookingLiveSid || bookingLiveStatus !== "polling") {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    async function poll() {
+      attempts += 1;
+      try {
+        const response = await fetch(
+          `/api/insurance-navigator/call-result?call_sid=${encodeURIComponent(
+            bookingLiveSid as string
+          )}`,
+          { cache: "no-store" }
+        );
+        const payload = (await response.json()) as {
+          status?: string;
+          booking?: { confirmation_id: string; scheduled_for: string; booked: boolean };
+        };
+        if (cancelled) {
+          return;
+        }
+        if (payload.status === "ready" && payload.booking) {
+          const liveBooking = payload.booking;
+          setBookingResult((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  scheduled_for: liveBooking.scheduled_for || prev.scheduled_for,
+                  confirmation_id: liveBooking.confirmation_id || prev.confirmation_id,
+                }
+              : prev
+          );
+          setBookingSource("live_call");
+          setBookingLiveStatus("ready");
+          return;
+        }
+        if (payload.status === "failed") {
+          setBookingLiveStatus("failed");
+          return;
+        }
+      } catch {
+        // Swallow transient polling errors; keep trying until the attempt budget runs out.
+      }
+      if (!cancelled && attempts >= LIVE_CALL_RESULT_POLL_MAX_ATTEMPTS) {
+        setBookingLiveStatus("failed");
+      }
+    }
+
+    const timer = setInterval(() => {
+      void poll();
+    }, LIVE_CALL_RESULT_POLL_INTERVAL_MS);
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [bookingLiveSid, bookingLiveStatus]);
+
   const issueByField = useMemo(() => {
     const map = new Map<string, string>();
     for (const issue of issues) {
@@ -240,6 +385,9 @@ export default function InsuranceNavigatorPage() {
     setBookingResult(null);
     setBookingCallTrigger(null);
     setSelectedProviderId(null);
+    setLiveCallSid(null);
+    setLiveCallStatus("idle");
+    setCoverageSource("ai_estimate");
 
     try {
       const body = {
@@ -307,6 +455,25 @@ export default function InsuranceNavigatorPage() {
       setResult(normalizedPayload);
       setSelectedProviderId(normalizedPayload.recommended_provider_id);
 
+      // The Coverage Snapshot above is an immediate AI estimate. If a live insurance
+      // verification call was actually placed, poll the bridge for the real
+      // transcript-derived result and swap it in once the call ends.
+      const insuranceCallSid =
+        normalizedPayload.meta.stage_outbound_calls.find(
+          (item) =>
+            item.stage === "insurance_verification" &&
+            item.status === "triggered" &&
+            item.call_sid
+        )?.call_sid ||
+        (normalizedPayload.meta.outbound_call.status === "triggered"
+          ? normalizedPayload.meta.outbound_call.call_sid
+          : undefined);
+
+      if (insuranceCallSid) {
+        setLiveCallSid(insuranceCallSid);
+        setLiveCallStatus("polling");
+      }
+
       if (form.save_insurance_info) {
         getLocalStorageOrNull()?.setItem(
           SAVED_INSURANCE_STORAGE_KEY,
@@ -337,42 +504,33 @@ export default function InsuranceNavigatorPage() {
       return;
     }
 
+    if (!form.callback_phone.trim()) {
+      setBookingError("Add your phone number before booking (the agent calls you as the scheduler).");
+      return;
+    }
+
     setBookingLoading(true);
     setBookingError(null);
     setBookingResult(null);
     setBookingCallTrigger(null);
+    setBookingLiveSid(null);
+    setBookingLiveStatus("idle");
+    setBookingSource("ai_estimate");
+
+    // Mirror the insurance flow: place the live booking call directly and populate the
+    // card from the real transcript. No AI-simulated confirmation is shown — the
+    // confirmation number and scheduled time come only from the live call.
+    const placeholder: BookingPayload = {
+      confirmation_id: "",
+      provider_name: provider.provider_name,
+      scheduled_for: preferredDate,
+      status: "booked",
+      booking_phone: provider.phone,
+    };
 
     try {
-      const response = await fetch("/api/insurance-navigator/book", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider_id: provider.provider_id,
-          provider_name: provider.provider_name,
-          provider_phone: provider.phone,
-          procedure_name: result.cpt.procedure_name,
-          plan_name: result.intake.plan_name,
-          member_id: result.intake.member_id,
-          group_number: result.intake.group_number,
-          preferred_dates: [preferredDate],
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        setBookingError("Booking call failed. Try a different date and retry.");
-        return;
-      }
-
-      const raw = payload as BookingPayload;
-      const cleanConfirmation = (raw.confirmation_id || "").replace(/[^A-Za-z0-9-]/g, "");
-      const booked: BookingPayload = {
-        ...raw,
-        scheduled_for: preferredDate,
-        confirmation_id: cleanConfirmation || raw.confirmation_id,
-      };
-      await triggerBookingCallWithContext(booked, result);
-      setBookingResult(booked);
+      await triggerBookingCallWithContext(placeholder, result);
+      setBookingResult(placeholder);
     } catch {
       setBookingError("Network error while booking. Please try again.");
     } finally {
@@ -393,6 +551,9 @@ export default function InsuranceNavigatorPage() {
     setBookingCallLoading(true);
     setBookingError(null);
     setBookingCallTrigger(null);
+    setBookingLiveSid(null);
+    setBookingLiveStatus("idle");
+    setBookingSource("ai_estimate");
     try {
       const response = await fetch("/api/insurance-navigator/book-call", {
         method: "POST",
@@ -413,7 +574,15 @@ export default function InsuranceNavigatorPage() {
         setBookingError("Booking call trigger failed. Try again.");
         return;
       }
-      setBookingCallTrigger(payload as BookingCallTriggerPayload);
+      const triggerPayload = payload as BookingCallTriggerPayload;
+      setBookingCallTrigger(triggerPayload);
+
+      // The confirmation shown is an AI estimate until the live booking call ends.
+      // Poll the bridge for the real scheduler-confirmed details and swap them in.
+      if (triggerPayload.status === "triggered" && triggerPayload.call_sid) {
+        setBookingLiveSid(triggerPayload.call_sid);
+        setBookingLiveStatus("polling");
+      }
     } catch {
       setBookingError("Network error while triggering booking call.");
     } finally {
@@ -462,8 +631,8 @@ export default function InsuranceNavigatorPage() {
     if (bookingCallTrigger) {
       bookingStatus = bookingCallTrigger.status;
       if (bookingCallTrigger.status === "triggered") {
-        const when = bookingCallTrigger.scheduled_for || bookingResult?.scheduled_for;
-        const conf = bookingCallTrigger.confirmation_id || bookingResult?.confirmation_id;
+        const when = bookingResult?.scheduled_for || bookingCallTrigger.scheduled_for;
+        const conf = bookingResult?.confirmation_id || bookingCallTrigger.confirmation_id;
         bookingDetail = [
           when ? `Confirmed for ${when}` : "",
           conf ? `confirmation ${conf}` : "",
@@ -645,6 +814,54 @@ export default function InsuranceNavigatorPage() {
         <section className="in-card in-reveal in-results">
           <p className="in-kicker">What we found</p>
           <h2 className="in-h2">Coverage Snapshot</h2>
+          {(() => {
+            const isLive = coverageSource === "live_call";
+            const badge = isLive
+              ? { text: "Live call result", bg: "rgba(34,139,87,0.14)", fg: "#1c7a4d" }
+              : liveCallStatus === "polling"
+                ? {
+                    text: "Verifying coverage on the live call...",
+                    bg: "rgba(180,120,30,0.14)",
+                    fg: "#9a6712",
+                  }
+                : liveCallStatus === "failed"
+                  ? {
+                      text: "AI estimate - live call result unavailable",
+                      bg: "rgba(180,120,30,0.14)",
+                      fg: "#9a6712",
+                    }
+                  : { text: "AI estimate", bg: "rgba(120,120,140,0.14)", fg: "#5b5b6b" };
+            return (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: 0.2,
+                  background: badge.bg,
+                  color: badge.fg,
+                  marginBottom: 14,
+                }}
+              >
+                {liveCallStatus === "polling" && (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "currentColor",
+                      animation: "in-pulse 1.2s ease-in-out infinite",
+                    }}
+                  />
+                )}
+                {badge.text}
+              </div>
+            );
+          })()}
           <div className="in-stats">
             <div className="in-stat">
               <span className="in-stat-key">CPT</span>
@@ -654,33 +871,59 @@ export default function InsuranceNavigatorPage() {
             </div>
             <div className="in-stat">
               <span className="in-stat-key">Covered</span>
-              <span
-                className={
-                  result.insurance_call_result.covered
-                    ? "in-stat-val in-covered-yes"
-                    : "in-stat-val in-covered-no"
-                }
-              >
-                {result.insurance_call_result.covered ? "Yes" : "No"}
-              </span>
+              {coveragePending ? (
+                <span className="in-stat-val" style={{ opacity: 0.55, fontStyle: "italic" }}>
+                  Verifying on the call...
+                </span>
+              ) : (
+                <span
+                  className={
+                    result.insurance_call_result.covered
+                      ? "in-stat-val in-covered-yes"
+                      : "in-stat-val in-covered-no"
+                  }
+                >
+                  {result.insurance_call_result.covered ? "Yes" : "No"}
+                </span>
+              )}
             </div>
             <div className="in-stat">
               <span className="in-stat-key">Deductible</span>
-              <span className="in-stat-val">
-                ${result.insurance_call_result.deductible_met} met of $
-                {result.insurance_call_result.deductible_total} (
-                ${result.insurance_call_result.deductible_remaining} remaining)
-              </span>
+              {coveragePending ? (
+                <span className="in-stat-val" style={{ opacity: 0.55, fontStyle: "italic" }}>
+                  Verifying on the call...
+                </span>
+              ) : (
+                <span className="in-stat-val">
+                  ${result.insurance_call_result.deductible_met} met of $
+                  {result.insurance_call_result.deductible_total} (
+                  ${result.insurance_call_result.deductible_remaining} remaining)
+                </span>
+              )}
             </div>
             <div className="in-stat">
               <span className="in-stat-key">Coinsurance</span>
-              <span className="in-stat-val">{result.insurance_call_result.coinsurance_percentage}%</span>
+              {coveragePending ? (
+                <span className="in-stat-val" style={{ opacity: 0.55, fontStyle: "italic" }}>
+                  Verifying on the call...
+                </span>
+              ) : (
+                <span className="in-stat-val">
+                  {result.insurance_call_result.coinsurance_percentage}%
+                </span>
+              )}
             </div>
             <div className="in-stat">
               <span className="in-stat-key">Facility Types</span>
-              <span className="in-stat-val">
-                {result.insurance_call_result.facility_types_covered.join(", ")}
-              </span>
+              {coveragePending ? (
+                <span className="in-stat-val" style={{ opacity: 0.55, fontStyle: "italic" }}>
+                  Verifying on the call...
+                </span>
+              ) : (
+                <span className="in-stat-val">
+                  {result.insurance_call_result.facility_types_covered.join(", ")}
+                </span>
+              )}
             </div>
             <div className="in-stat">
               <span className="in-stat-key">Resolved Phone</span>
@@ -784,7 +1027,57 @@ export default function InsuranceNavigatorPage() {
             )}
             {bookingCallTrigger && bookingCallTrigger.status === "triggered" && bookingResult && (
               <div className="in-confirmation">
-                <div className="in-confirmation-head">Appointment Confirmed</div>
+                <div className="in-confirmation-head">
+                  {bookingPending ? "Booking on the live call..." : "Appointment Confirmed"}
+                </div>
+                {(() => {
+                  const isLive = bookingSource === "live_call";
+                  const badge = isLive
+                    ? { text: "Live call result", bg: "rgba(34,139,87,0.14)", fg: "#1c7a4d" }
+                    : bookingLiveStatus === "polling"
+                      ? {
+                          text: "Confirming booking on the live call...",
+                          bg: "rgba(180,120,30,0.14)",
+                          fg: "#9a6712",
+                        }
+                      : bookingLiveStatus === "failed"
+                        ? {
+                            text: "Live booking result unavailable",
+                            bg: "rgba(180,120,30,0.14)",
+                            fg: "#9a6712",
+                          }
+                        : { text: "Confirming booking on the live call...", bg: "rgba(180,120,30,0.14)", fg: "#9a6712" };
+                  return (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "4px 12px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: 0.2,
+                        background: badge.bg,
+                        color: badge.fg,
+                        margin: "6px 0 12px",
+                      }}
+                    >
+                      {bookingLiveStatus === "polling" && (
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "currentColor",
+                            animation: "in-pulse 1.2s ease-in-out infinite",
+                          }}
+                        />
+                      )}
+                      {badge.text}
+                    </div>
+                  );
+                })()}
                 <div className="in-confirmation-row">
                   <span className="in-confirmation-label">Provider</span>
                   <span className="in-confirmation-value">{bookingResult.provider_name}</span>
@@ -797,18 +1090,30 @@ export default function InsuranceNavigatorPage() {
                 )}
                 <div className="in-confirmation-row">
                   <span className="in-confirmation-label">Date / Time</span>
-                  <span className="in-confirmation-value">
-                    {bookingCallTrigger.scheduled_for || bookingResult.scheduled_for}
+                  <span
+                    className="in-confirmation-value"
+                    style={bookingPending ? { opacity: 0.55, fontStyle: "italic" } : undefined}
+                  >
+                    {bookingPending
+                      ? "Confirming on the call..."
+                      : bookingResult.scheduled_for || bookingCallTrigger.scheduled_for}
                   </span>
                 </div>
-                {(bookingCallTrigger.confirmation_id || bookingResult.confirmation_id) && (
-                  <div className="in-confirmation-row">
-                    <span className="in-confirmation-label">Confirmation</span>
-                    <span className="in-confirmation-value">
-                      {bookingCallTrigger.confirmation_id || bookingResult.confirmation_id}
+                <div className="in-confirmation-row">
+                  <span className="in-confirmation-label">Confirmation</span>
+                  {bookingPending ? (
+                    <span
+                      className="in-confirmation-value"
+                      style={{ opacity: 0.55, fontStyle: "italic" }}
+                    >
+                      Confirming on the call...
                     </span>
-                  </div>
-                )}
+                  ) : (
+                    <span className="in-confirmation-value">
+                      {bookingResult.confirmation_id || bookingCallTrigger.confirmation_id || "-"}
+                    </span>
+                  )}
+                </div>
                 {bookingCallTrigger.call_sid && (
                   <div className="in-confirmation-row">
                     <span className="in-confirmation-label">Call ID</span>
@@ -816,8 +1121,9 @@ export default function InsuranceNavigatorPage() {
                   </div>
                 )}
                 <div className="in-confirmation-note">
-                  A confirmation call was placed to your number. The agent confirmed these details
-                  with the scheduler.
+                  {bookingPending
+                    ? "A live call is underway. The agent is confirming these details with the scheduler now."
+                    : "A confirmation call was placed to your number. The agent confirmed these details with the scheduler."}
                 </div>
               </div>
             )}

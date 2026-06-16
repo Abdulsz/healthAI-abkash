@@ -8,6 +8,27 @@ function parseNumber(raw: string): number {
   return Number.isFinite(numeric) ? numeric : NaN;
 }
 
+const FACILITY_FIELD_NOISE = /\b(covered|deductible|coinsurance|facility[_\s]?types?)\b/i;
+
+export function parseFacilityTypes(raw: string): string[] {
+  // The model sometimes appends a JSON-ish object dump on the same line, e.g.
+  // "[imaging center, hospital outpatient]] {covered:true, deductible_total:1500, ...}".
+  // Cut everything from the first object/array close or other structured field so we
+  // only keep the actual facility list.
+  let value = raw.trim();
+  const cutAt = value.search(/[}{]/);
+  if (cutAt !== -1) {
+    value = value.slice(0, cutAt);
+  }
+
+  return value
+    .replace(/[\[\]"']/g, "")
+    .split(/,| and /i)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .filter((entry) => !entry.includes(":") && !FACILITY_FIELD_NOISE.test(entry));
+}
+
 function parseInsuranceCallFromText(raw: string): InsuranceCallResult {
   const coveredMatch = raw.match(
     /(?:covered|coverage)\s*[:=-]?\s*(true|false|yes|no|covered|not covered)/i
@@ -40,10 +61,7 @@ function parseInsuranceCallFromText(raw: string): InsuranceCallResult {
     deductible_met: Math.max(0, Math.round(deductibleMet)),
     deductible_remaining: Math.max(0, Math.round(deductibleTotal - deductibleMet)),
     coinsurance_percentage: Number.isFinite(coinsurance) ? Math.max(0, Math.round(coinsurance)) : 0,
-    facility_types_covered: (facilitiesMatch?.[1] || "")
-      .split(/,| and /i)
-      .map((value) => value.trim())
-      .filter(Boolean),
+    facility_types_covered: parseFacilityTypes(facilitiesMatch?.[1] || ""),
   };
 }
 
@@ -100,7 +118,7 @@ export class GrokInsuranceCallAdapter implements InsuranceCallAdapter {
           ? Math.max(0, Math.round(coinsurance))
           : 0,
         facility_types_covered: Array.isArray(result.facility_types_covered)
-          ? result.facility_types_covered.map((value) => String(value))
+          ? result.facility_types_covered.flatMap((value) => parseFacilityTypes(String(value)))
           : ["hospital outpatient", "imaging center"],
       };
     } catch {

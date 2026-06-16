@@ -48,6 +48,26 @@ export type InsuranceCallResult = {
   facility_types_covered: string[];
 };
 
+export type InsuranceCallResultSource = "ai_estimate" | "live_call";
+
+export type LiveCallResultStatus = "pending" | "ready" | "failed" | "not_found";
+
+export type LiveBookingResult = {
+  confirmation_id: string;
+  scheduled_for: string;
+  booked: boolean;
+};
+
+export type LiveCallResultResponse = {
+  call_sid: string;
+  stage: string;
+  status: LiveCallResultStatus;
+  result?: InsuranceCallResult;
+  booking?: LiveBookingResult;
+  transcript?: string;
+  error?: string;
+};
+
 export type InsuranceCallInput = {
   plan_name: string;
   member_id: string;
